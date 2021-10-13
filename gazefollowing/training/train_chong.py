@@ -124,26 +124,26 @@ def train(net, train_dataloader, val_dataloader, optimizer, epoch, logger):
     # Validation
     net.eval()
     for i, (img, face, head_channel, gaze_heatmap, name, gaze_inside) in tqdm(enumerate(val_dataloader), total=len(train_dataloader)):
-    images = img.cuda()
-    head = head_channel.cuda()
-    faces = face.cuda()
-    gaze_heatmap = gaze_heatmap.cuda()
-    gaze_heatmap_pred, attmap, inout_pred = net(images, head, faces)
-    gaze_heatmap_pred = gaze_heatmap_pred.squeeze(1)
+        images = img.cuda()
+        head = head_channel.cuda()
+        faces = face.cuda()
+        gaze_heatmap = gaze_heatmap.cuda()
+        gaze_heatmap_pred, attmap, inout_pred = net(images, head, faces)
+        gaze_heatmap_pred = gaze_heatmap_pred.squeeze(1)
 
-    # Loss
-        # l2 loss computed only for inside case
-    l2_loss = mse_loss(gaze_heatmap_pred, gaze_heatmap)*loss_amp_factor
-    l2_loss = torch.mean(l2_loss, dim=1)
-    l2_loss = torch.mean(l2_loss, dim=1)
-    gaze_inside = gaze_inside.cuda().to(torch.float)
-    l2_loss = torch.mul(l2_loss, gaze_inside) # zero out loss when it's out-of-frame gaze case
-    l2_loss = torch.sum(l2_loss)/torch.sum(gaze_inside)
-        # cross entropy loss for in vs out
-    Xent_loss = bcelogit_loss(inout_pred.squeeze(), gaze_inside.squeeze())*100
+        # Loss
+            # l2 loss computed only for inside case
+        l2_loss = mse_loss(gaze_heatmap_pred, gaze_heatmap)*loss_amp_factor
+        l2_loss = torch.mean(l2_loss, dim=1)
+        l2_loss = torch.mean(l2_loss, dim=1)
+        gaze_inside = gaze_inside.cuda().to(torch.float)
+        l2_loss = torch.mul(l2_loss, gaze_inside) # zero out loss when it's out-of-frame gaze case
+        l2_loss = torch.sum(l2_loss)/torch.sum(gaze_inside)
+            # cross entropy loss for in vs out
+        Xent_loss = bcelogit_loss(inout_pred.squeeze(), gaze_inside.squeeze())*100
 
-    total_loss = l2_loss
-    validation_loss.append(total_loss.item())
+        total_loss = l2_loss
+        validation_loss.append(total_loss.item())
 
     return running_loss, validation_loss
         # step += 1
