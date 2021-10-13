@@ -145,7 +145,7 @@ def train(net, train_dataloader, val_dataloader, optimizer, epoch, logger):
         total_loss = l2_loss
         validation_loss.append(total_loss.item())
 
-    return running_loss, validation_loss
+    return running_loss, validation_loss, net
         # step += 1
 
 def test(net, test_data_loader, logger, save_output=False):
