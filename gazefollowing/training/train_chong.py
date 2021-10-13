@@ -73,7 +73,7 @@ def _get_transform():
     return transforms.Compose(transform_list)
 
 
-def train(net, train_dataloader, optimizer, epoch, logger):
+def train(net, train_dataloader, val_dataloader, optimizer, epoch, logger):
     # Loss functions
     mse_loss = nn.MSELoss(reduce=False) # not reducing in order to ignore outside cases
     bcelogit_loss = nn.BCEWithLogitsLoss()
@@ -85,6 +85,7 @@ def train(net, train_dataloader, optimizer, epoch, logger):
 
     # print("Training in progress ...")
     running_loss = []
+    validation_loss = []
 
     net.train(True)
     for i, (img, face, head_channel, gaze_heatmap, name, gaze_inside) in tqdm(enumerate(train_dataloader), total=len(train_dataloader)):
@@ -119,7 +120,32 @@ def train(net, train_dataloader, optimizer, epoch, logger):
             logger.info('%s'%(str(np.mean(running_loss, axis=0))))
             running_loss = []
 
-    return running_loss
+
+    # Validation
+    net.eval()
+    for i, (img, face, head_channel, gaze_heatmap, name, gaze_inside) in tqdm(enumerate(val_dataloader), total=len(train_dataloader)):
+    images = img.cuda()
+    head = head_channel.cuda()
+    faces = face.cuda()
+    gaze_heatmap = gaze_heatmap.cuda()
+    gaze_heatmap_pred, attmap, inout_pred = net(images, head, faces)
+    gaze_heatmap_pred = gaze_heatmap_pred.squeeze(1)
+
+    # Loss
+        # l2 loss computed only for inside case
+    l2_loss = mse_loss(gaze_heatmap_pred, gaze_heatmap)*loss_amp_factor
+    l2_loss = torch.mean(l2_loss, dim=1)
+    l2_loss = torch.mean(l2_loss, dim=1)
+    gaze_inside = gaze_inside.cuda().to(torch.float)
+    l2_loss = torch.mul(l2_loss, gaze_inside) # zero out loss when it's out-of-frame gaze case
+    l2_loss = torch.sum(l2_loss)/torch.sum(gaze_inside)
+        # cross entropy loss for in vs out
+    Xent_loss = bcelogit_loss(inout_pred.squeeze(), gaze_inside.squeeze())*100
+
+    total_loss = l2_loss
+    validation_loss.append(total_loss.item())
+
+    return running_loss, validation_loss
         # step += 1
 
 def test(net, test_data_loader, logger, save_output=False):
